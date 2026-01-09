@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "FalseGrip Client",
+    "slug": "falsegrip-client",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "jsEngine": "hermes"
+  }
+}
