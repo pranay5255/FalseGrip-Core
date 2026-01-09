@@ -6,10 +6,10 @@ Build a fitness coaching platform with two interfaces served by a single backend
 
 | Interface | User | Platform | Purpose |
 |-----------|------|----------|---------|
-| **Coach Dashboard** | Trainers | Next.js Web App | Configure bot behavior, view client conversations, analytics |
-| **Client Chat** | End Users | Expo Mobile App | Simple chat interface to interact with AI coach |
+| **Coach Dashboard** | Trainers | Next.js Web App (`webapp[coachUI]/`) | Configure bot behavior, view client conversations, analytics |
+| **Client Chat** | End Users | Simple chat app (mobile, to be built) | Simple chat interface to interact with AI coach |
 
-**Core Flow**: Coaches define *how* the bot behaves (persona, rules, questions). Clients interact with an *instance* of that configuration through a mobile chat app.
+**Core Flow**: Coaches define *how* the bot behaves (persona, rules, questions). Clients interact with an *instance* of that configuration through a simple chat app.
 
 **Backend Note**: All API definitions, database schema, and shared types live in `src/` (single backend serving both UIs).
 
@@ -22,12 +22,12 @@ Build a fitness coaching platform with two interfaces served by a single backend
 │                              MONOREPO                                    │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  ┌──────────────────┐     ┌──────────────────┐                           │
-│  │   ui/            │     │   mobile/        │                           │
-│  │   (Next.js)      │     │   (Expo)         │                           │
-│  │  Coach Dashboard │     │  Client Chat     │                           │
-│  │  (front-end)     │     │  (front-end)     │                           │
-│  └────────┬─────────┘     └────────┬─────────┘                           │
+│  ┌──────────────────────┐     ┌──────────────────┐                       │
+│  │   webapp[coachUI]/   │     │   mobile/        │                       │
+│  │   (Next.js)          │     │   (Expo)         │                       │
+│  │  Coach Dashboard     │     │  Client Chat     │                       │
+│  │  (front-end)         │     │  (front-end)     │                       │
+│  └──────────┬───────────┘     └────────┬─────────┘                       │
 │           │                        │                                     │
 │           └──────────────┬─────────┘                                     │
 │                          ▼                                               │
@@ -43,7 +43,7 @@ Build a fitness coaching platform with two interfaces served by a single backend
 │                          ▼                                               │
 │                    ┌───────────────────┐                                │
 │                    │     Database      │                                │
-│                    │   (SQLite/Turso)  │                                │
+│                    │    (Postgres)     │                                │
 │                    └───────────────────┘                                │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -60,60 +60,61 @@ Build a fitness coaching platform with two interfaces served by a single backend
 ## Directory Structure
 
 ```
-falsegrip/
+FalseGrip-Core/
 ├── src/                           # BACKEND API + core modules (Node/TS)
-├── ui/                            # NEXT.JS COACH DASHBOARD (front-end only)
+├── webapp[coachUI]/               # NEXT.JS COACH DASHBOARD (front-end)
+│   ├── app/
+│   │   └── api/                    # Temporary Next.js API routes (migrate to src)
+│   ├── components/
+│   ├── lib/
+│   └── db/                         # Current schema (Postgres)
+├── mobile/                        # CLIENT CHAT APP (Expo, to be created)
 │   ├── app/
 │   ├── components/
-│   └── lib/
-├── mobile/                        # EXPO CLIENT APP (chat UI)
-│   ├── app/
-│   ├── components/
-│   ├── hooks/
-│   └── constants/
-├── data/                          # Legacy WhatsApp demo logs (to deprecate)
-├── downloads/                     # Legacy WhatsApp demo media (to deprecate)
-└── package.json
+│   └── ...
+├── falsegrip-v1-prd.md
+└── README.md
 ```
 
 ---
 
 ## Current Repo Context (As-Is)
 
-- `src/index.ts` is currently a WhatsApp bot entrypoint (whatsapp-web.js + Puppeteer) used for a demo; this WhatsApp adapter will be deprecated and should not be integrated into the production backend.
+- `src/index.ts` is currently a WhatsApp bot entrypoint (whatsapp-web.js + Puppeteer) used for a demo; this WhatsApp adapter will be deprecated and must not be integrated into the production backend.
 - `src/` already includes the OpenRouter client and prompt modules (`openrouter.ts`, `modulePrompt.ts`, `qnaTemplate.ts`, `scienceBrief.ts`, `chatSummary.ts`, `plateCalorieEstimator.ts`).
-- `ui/` is a Next.js coach dashboard with mock data and UI components; it does not call the backend yet.
-- `mobile/` is an Expo app that currently mirrors the dashboard-style mock UI; it is not yet a chat interface.
-- Root `package.json` is the backend app; `ui/` and `mobile/` have their own package.json files (no workspaces yet).
-- `data/` and `downloads/` are legacy WhatsApp demo artifacts and should be removed once the demo is deprecated.
+- `webapp[coachUI]/` is a Next.js coach dashboard with mock data and UI components; it also includes `app/api/client-configs` routes that talk directly to Postgres via `webapp[coachUI]/lib/db.ts`.
+- `webapp[coachUI]/db/schema.sql` defines a minimal `client_configs` table (JSONB) and is the only schema currently captured in repo.
+- No client chat app exists yet; the client UI must be a simple chat app (mobile) that consumes the `src/` backend.
+- There is no root `package.json` for the backend service yet; only `webapp[coachUI]` has app dependencies.
 
 ---
 
 # PHASE 1: PROJECT FOUNDATION
 
-## 1.1 Repo Alignment (Current State: backend root + ui/ + mobile/)
+## 1.1 Repo Alignment (Current State: src/ backend + webapp[coachUI]/ + client app planned)
 
 ### 1.1.1 Workspace Strategy
-- **Task**: Decide whether to keep separate package.json files or migrate to pnpm workspaces.
+- **Task**: Decide whether to introduce a root backend package.json and adopt pnpm workspaces.
 - **Subtasks**:
-  - If adopting workspaces, include `["ui", "mobile"]` and keep root scripts for the backend.
+  - If adopting workspaces, include `webapp[coachUI]` and `mobile` (when created) and keep root scripts for the backend.
   - Add shared TypeScript base config (`tsconfig.base.json`) if cross-package types are needed.
-  - Update root README with dev commands for backend, `ui/`, and `mobile/`.
-  - Keep `.gitignore` aligned with all three apps (already present).
+  - Update root README with dev commands for backend, `webapp[coachUI]/`, and `mobile/`.
+  - Add/confirm `.gitignore` entries for `webapp[coachUI]/node_modules`, `webapp[coachUI]/.next`, and backend build output.
+  - Update or archive `webapp[coachUI]/plan.md` (currently references `ui/` and conflicts with this structure).
 
 ### 1.1.2 Backend Service Entry (`src/`)
 - **Task**: Formalize `src/` as the backend service entrypoint (HTTP API + DB).
 - **Subtasks**:
-  - Keep `src/index.ts` as the primary server entrypoint and implement the HTTP server layer there.
-  - Remove or isolate WhatsApp-specific wiring so it does not run in production.
+  - Replace the WhatsApp bootstrap in `src/index.ts` with an HTTP server entrypoint.
+  - Move the WhatsApp demo into `src/demo/whatsapp` or `scripts/whatsapp` so it is not in the production build.
   - Introduce `src/api/` for route handlers and `src/types.ts` for shared request/response types.
   - Add `src/db/` for schema + migrations (per "API + DB live in src" requirement).
 
 ### 1.1.3 Environment Variables Strategy
-- **Task**: Define environment variable structure across backend, ui, and mobile.
+- **Task**: Define environment variable structure across backend, coach UI, and client app.
 - **Subtasks**:
   - Keep `.env.example` at repo root for backend (`OPENROUTER_*`, database).
-  - Add `.env.example` for `ui/` with `NEXT_PUBLIC_API_URL`.
+  - Add `.env.example` for `webapp[coachUI]/` with `NEXT_PUBLIC_API_URL`.
   - Add `.env.example` for `mobile/` with `EXPO_PUBLIC_API_URL`.
   - Add runtime env validation in the backend at startup.
 
@@ -123,6 +124,7 @@ falsegrip/
 
 ### 1.2.1 Schema Design
 - **Task**: Design complete database schema for all entities
+- **Existing schema note**: `webapp[coachUI]/db/schema.sql` currently defines `client_configs` with `client_id` (PK) and a `config` JSONB blob. Decide whether to keep JSONB for v1 or migrate to normalized columns; plan the migration either way.
 - **Entities to define**:
 
 #### `coaches` table
@@ -179,10 +181,11 @@ falsegrip/
 ### 1.2.2 Database Client Setup
 - **Task**: Set up database client in `src/db/` (backend)
 - **Subtasks**:
-  - Choose database provider (Turso for serverless SQLite recommended)
-  - Create connection client with proper error handling
+  - Choose database provider (Postgres is current in `webapp[coachUI]/`; keep it for v1 unless switching to SQLite/Turso)
+  - Create connection client with proper error handling (`pg` if Postgres)
   - Implement query helper functions
   - Add connection pooling/reuse for long-lived Node process
+  - Port `webapp[coachUI]/db/schema.sql` into `src/db` migrations as the baseline schema
   - Create migration runner for schema changes
 
 ### 1.2.3 Indexes and Performance
@@ -207,12 +210,13 @@ falsegrip/
 ### 1.3.2 Prompt Modules (Existing)
 - **Task**: Validate and extend existing prompt modules in `src/`.
 - **Files to audit**:
-  - `modulePrompt.ts`
+  - `modulePrompt.ts` — `SCIENCE_PROMPT_TEMPLATE` includes `{{CONTEXT_SECTION}}`; update template or builder to replace it
   - `qnaTemplate.ts`
-  - `scienceBrief.ts` — Fix `{{CONTEXT_SECTION}}` placeholder bug in the template
+  - `scienceBrief.ts`
   - `chatSummary.ts`
 - **Subtasks**:
   - Verify all template placeholders are properly replaced.
+  - Remove WhatsApp-specific wording in system prompts now that the backend serves web/mobile clients.
   - Add unit tests for prompt builders.
 
 ### 1.3.3 Calorie Estimator (Existing)
@@ -262,6 +266,7 @@ falsegrip/
 - **Task**: Explicitly deprecate the WhatsApp demo adapter and keep it out of production scope.
 - **Subtasks**:
   - Remove WhatsApp-specific flow from the backend build path (or park it under a `demo/` or `scripts/` area).
+  - Drop `whatsapp-web.js` + `puppeteer` from production dependencies once the demo is isolated.
   - Do not route production API traffic through WhatsApp-specific commands.
   - Update README to reflect the new backend-first architecture.
 
@@ -269,7 +274,7 @@ falsegrip/
 
 # PHASE 2: BACKEND API (src)
 
-All HTTP endpoints, request/response types, and database access live in `src/`. Both `ui/` and `mobile/` consume this single backend.
+All HTTP endpoints, request/response types, and database access live in `src/`. Both `webapp[coachUI]/` and `mobile/` consume this single backend.
 
 ## 2.1 Chat Endpoint
 
@@ -320,6 +325,7 @@ All HTTP endpoints, request/response types, and database access live in `src/`. 
 ---
 
 ## 2.2 Client Config Endpoints
+- **Migration note**: `webapp[coachUI]/app/api/client-configs` currently reads/writes `client_configs` by `client_id` with a JSONB `config` blob. Decide whether to preserve this shape for v1 or migrate to the normalized schema; update the coach UI and data accordingly.
 
 ### 2.2.1 `GET /api/client-configs` — List Configs
 - **Task**: Return all configs for dashboard
@@ -477,17 +483,18 @@ All HTTP endpoints, request/response types, and database access live in `src/`. 
 
 # PHASE 3: COACH DASHBOARD (Next.js Web App)
 
-Current state: `ui/` already contains a mock dashboard UI (single-page, mock data). This phase focuses on wiring it to the `src/` backend and splitting it into real routes.
+Current state: `webapp[coachUI]/` already contains a mock dashboard UI (single-page, mock data) plus temporary Next.js API routes under `app/api/client-configs`. This phase focuses on wiring the UI to the `src/` backend and removing those Next.js API routes once backend endpoints exist.
 
 ## 3.1 Project Setup
 
 ### 3.1.1 Next.js Configuration
-- **Task**: Audit the existing Next.js project in `ui/`.
+- **Task**: Audit the existing Next.js project in `webapp[coachUI]/`.
 - **Subtasks**:
   - Confirm App Router usage (already in place).
   - Set up `NEXT_PUBLIC_API_URL` for backend access.
   - Verify path aliases and environment variable loading.
   - Confirm deployment target for a front-end-only app.
+  - Remove/replace `app/api` routes after `src/` endpoints are available.
 
 ### 3.1.2 Styling Setup
 - **Task**: Confirm Tailwind + global styles are already in place.
@@ -506,7 +513,7 @@ Current state: `ui/` already contains a mock dashboard UI (single-page, mock dat
   - Dialog/Modal
   - Toast notifications
 - **Subtasks**:
-  - Verify components render correctly in `ui/`.
+  - Verify components render correctly in `webapp[coachUI]/`.
 
 ---
 
@@ -774,16 +781,16 @@ Current state: `ui/` already contains a mock dashboard UI (single-page, mock dat
 
 ---
 
-# PHASE 4: CLIENT MOBILE APP (Expo)
+# PHASE 4: CLIENT CHAT APP (Expo)
 
-Current state: `mobile/` exists but mirrors the dashboard mock UI. Replace it with a simple chat app backed by the `src/` API.
+Current state: no `mobile/` app exists yet. Create a simple chat app backed by the `src/` API.
 
 ## 4.1 Project Setup
 
 ### 4.1.1 Expo Configuration
-- **Task**: Audit the existing Expo project in `mobile/` and refocus it on a simple chat UI.
+- **Task**: Create a new Expo project in `mobile/` focused on a simple chat UI.
 - **Subtasks**:
-  - Keep Expo Router but remove the current dashboard/tabs scaffolding.
+  - Add Expo Router and configure entry to use router.
   - Configure for Expo Go development.
   - Set up EAS Build for production.
   - Configure app.json with proper identifiers.
@@ -1138,9 +1145,9 @@ Current state: `mobile/` exists but mirrors the dashboard mock UI. Replace it wi
 
 ### 6.1.2 Database Setup
 - **Task**: Provision production database
-- **Recommendation**: Turso (SQLite edge)
+- **Recommendation**: Postgres (to match current `webapp[coachUI]/` usage)
 - **Subtasks**:
-  - Create Turso database
+  - Create Postgres database
   - Run schema migrations
   - Set connection string in backend env vars
 
@@ -1156,13 +1163,13 @@ Current state: `mobile/` exists but mirrors the dashboard mock UI. Replace it wi
 ## 6.2 Front-End Deployment
 
 ### 6.2.1 Coach Dashboard Deployment
-- **Task**: Deploy `ui/` as a front-end app (Vercel or similar).
+- **Task**: Deploy `webapp[coachUI]/` as a front-end app (Vercel or similar).
 - **Subtasks**:
-  - Set root directory to `ui/`
+  - Set root directory to `webapp[coachUI]/`
   - Configure build command
   - Point `NEXT_PUBLIC_API_URL` to the backend
 
-### 6.2.2 Mobile App Distribution
+### 6.2.2 Client Chat App Distribution
 - **Task**: Create development build for testing
 - **Command**: `eas build --profile development`
 - **Output**: Install link for testers
@@ -1203,12 +1210,12 @@ Current state: `mobile/` exists but mirrors the dashboard mock UI. Replace it wi
 
 ### Root / Shared
 ```
-DATABASE_URL=<turso-connection-string>
-DATABASE_AUTH_TOKEN=<turso-auth-token>
+DATABASE_URL=<postgres-connection-string>
+POSTGRES_URL=<postgres-connection-string>
 OPENROUTER_API_KEY=<openrouter-key>
 ```
 
-### `ui/` (Next.js)
+### `webapp[coachUI]/` (Next.js)
 ```
 NEXT_PUBLIC_API_URL=https://api.your-domain.com
 ```
@@ -1252,7 +1259,7 @@ EXPO_PUBLIC_API_URL=https://your-app.vercel.app
 - [ ] Analytics charts display data
 - [ ] Config changes save successfully
 
-### Mobile App
+### Client Chat App
 - [ ] Can enter client ID to connect
 - [ ] Invalid client ID shows error
 - [ ] Chat works in QnA mode
