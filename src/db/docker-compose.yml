@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: falsegrip-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: falsegrip
+      POSTGRES_USER: falsegrip
+      POSTGRES_PASSWORD: falsegrip
+    ports:
+      - "5432:5432"
+    volumes:
+      - falsegrip_pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/00_schema.sql:ro
+
+volumes:
+  falsegrip_pgdata:
+    name: falsegrip_pgdata
